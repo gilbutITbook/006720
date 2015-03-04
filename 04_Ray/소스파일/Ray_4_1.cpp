@@ -1,7 +1,7 @@
 ﻿//------------------------------------------------------------
-// Ray_3_1.cpp
-// 원형광선 
+// Ray_4_1.cpp
 // 
+// 자동 추적 레이저 
 //------------------------------------------------------------
 
 #include <windows.h>
@@ -10,71 +10,72 @@
 #define PI					3.14159265f			// 원주율 
 #define VIEW_WIDTH			640					// 화면 너비 
 #define VIEW_HEIGHT			480					// 화면 높이 
-#define RAY_WIDTH			50.0f				// 광선 너비 
-#define MIN_R				RAY_WIDTH			// 원의 최소 반지름
-#define MAX_DIVIDE_NUM		50					// 최대 원 분할 수 
+#define RAY_WIDTH			30.0f				// 광선 폭
+#define DIVIDE_NUM			30					// 곡선 분할수
+#define SEGMENT_LEN			30.0f				// 1세그먼트의 길이
+#define ANGLE_SPEED			( 2.0f * PI / 50.0f )	// 방향회전 스피드
 
-HWND        g_hWnd;							    // 윈도 핸들 
+HWND        g_hWnd;							    // 윈도 핸들
 
 struct MyVector2D {
 	float			x, y;
 };
 
-MyVector2D		v2Pos[MAX_DIVIDE_NUM * 4];
-int				nDivideNum = 0;
+MyVector2D		v2Pos[DIVIDE_NUM * 4];
 
 
-int InitRay( void )						// 처음에 한 번만 호출된다 
+int InitRay( void )						// 최초 한 번만 호출된다
 {
 	int					i;
 
-	for ( i = 0; i < MAX_DIVIDE_NUM * 4; i++ ) {
-		v2Pos[i].x = 0.0f;  v2Pos[i].y = 0.0f;			// 정점의 초기위치 ①
+	for ( i = 0; i < DIVIDE_NUM * 4; i++ ) {
+		v2Pos[i].x = 0.0f;  v2Pos[i].y = 0.0f;			// 정점 초기 위치①
 	}
 
 	return 0;
 }
 
 
-int MoveRay( void )						// 매 프레임 호출된다 
+int MoveRay( void )						// 매 프레임 호출된다
 {
 	int					i;
 	POINT			CursorPos;
-	POINT			CenterPos;
-	MyVector2D		v2Radius;
-	float			r;
-	float			r1;
-	float			r2;
-	float			fAngle1, fAngle2;				// 각도 
-	float			fAngleDiff;						// 각도 변화량 
-
-	CenterPos.x = VIEW_WIDTH / 2;  CenterPos.y = VIEW_HEIGHT / 2;  
-	GetCursorPos( &CursorPos );
-	ScreenToClient( g_hWnd, &CursorPos );
-
-	v2Radius.x = ( float )( CursorPos.x - CenterPos.x );
-	v2Radius.y = ( float )( CursorPos.y - CenterPos.y );
-	r = sqrtf( v2Radius.x * v2Radius.x + v2Radius.y * v2Radius.y );
-	if ( r < MIN_R ) r = MIN_R;
-	nDivideNum = ( int )( ( 2.0f * PI * r ) / 10 );
-	if ( nDivideNum > MAX_DIVIDE_NUM ) nDivideNum = MAX_DIVIDE_NUM;
-	fAngleDiff = 2.0f * PI / nDivideNum;
-	r1 = r - ( RAY_WIDTH / 2.0f );
-	r2 = r + ( RAY_WIDTH / 2.0f );
-
-	fAngle1 = 0.0f;
-	fAngle2 = fAngleDiff;
-	for ( i = 0; i < nDivideNum * 4; i += 4 ) {
-		v2Pos[i    ].x = r2 * cosf( fAngle1 ) + CenterPos.x;
-		v2Pos[i    ].y = r2 * sinf( fAngle1 ) + CenterPos.y;
-		v2Pos[i + 1].x = r2 * cosf( fAngle2 ) + CenterPos.x;
-		v2Pos[i + 1].y = r2 * sinf( fAngle2 ) + CenterPos.y;
-		v2Pos[i + 2].x = r1 * cosf( fAngle1 ) + CenterPos.x;
-		v2Pos[i + 2].y = r1 * sinf( fAngle1 ) + CenterPos.y;
-		v2Pos[i + 3].x = r1 * cosf( fAngle2 ) + CenterPos.x;
-		v2Pos[i + 3].y = r1 * sinf( fAngle2 ) + CenterPos.y;
-		fAngle1 += fAngleDiff;
-		fAngle2 += fAngleDiff;
+	MyVector2D		v2Present;
+	MyVector2D		v2Aim;
+	MyVector2D		v2Forward;
+	MyVector2D		v2Side1, v2Side2;
+	float			fAngle;							// 각도 
+	
+	v2Present.x = 0.0f;  v2Present.y = VIEW_HEIGHT / 2;
+	fAngle = 0.0f;
+	// 첫번째 포워드・사이드벡터
+	v2Forward.x = SEGMENT_LEN * cosf( fAngle );  v2Forward.y = SEGMENT_LEN * sinf( fAngle );
+	v2Side1.x = v2Forward.y;  v2Side1.y = -v2Forward.x;
+	v2Side1.x *= RAY_WIDTH / 2.0f / SEGMENT_LEN;  v2Side1.y *= RAY_WIDTH / 2.0f / SEGMENT_LEN;
+	for ( i = 0; i < DIVIDE_NUM * 4; i += 4 ) {
+		v2Forward.x = SEGMENT_LEN * cosf( fAngle );  v2Forward.y = SEGMENT_LEN * sinf( fAngle );
+		v2Side2.x = v2Forward.y;  v2Side2.y = -v2Forward.x;
+		v2Side2.x *= RAY_WIDTH / 2.0f / SEGMENT_LEN;  v2Side2.y *= RAY_WIDTH / 2.0f / SEGMENT_LEN;
+		v2Pos[i    ].x = v2Present.x + v2Side1.x;
+		v2Pos[i    ].y = v2Present.y + v2Side1.y;
+		v2Pos[i + 1].x = v2Present.x + v2Forward.x + v2Side2.x;
+		v2Pos[i + 1].y = v2Present.y + v2Forward.y + v2Side2.y;
+		v2Pos[i + 2].x = v2Present.x - v2Side1.x;
+		v2Pos[i + 2].y = v2Present.y - v2Side1.y;
+		v2Pos[i + 3].x = v2Present.x + v2Forward.x - v2Side2.x;
+		v2Pos[i + 3].y = v2Present.y + v2Forward.y - v2Side2.y;
+		v2Present.x += v2Forward.x;
+		v2Present.y += v2Forward.y;
+		v2Side1 = v2Side2;
+		GetCursorPos( &CursorPos );
+		ScreenToClient( g_hWnd, &CursorPos );
+		v2Aim.x = CursorPos.x - v2Present.x;  v2Aim.y = CursorPos.y - v2Present.y;
+		if ( ( v2Forward.x * v2Aim.y - v2Forward.y * v2Aim.x ) > 0.0f ) {
+			fAngle += ANGLE_SPEED;
+		}
+		else {
+			fAngle -= ANGLE_SPEED;
+		}
 	}
 
 	return 0;
@@ -86,7 +87,7 @@ int MoveRay( void )						// 매 프레임 호출된다
 
 #include <stdio.h>
 #include <windows.h>
-#include <tchar.h>								// Unicode 멀티바이트 문자체계 관련 
+#include <tchar.h>								// Unicode・멀티바이트 문자 관련
 
 #include <D3D11.h>
 #include <D3DX11.h>
@@ -94,34 +95,34 @@ int MoveRay( void )						// 매 프레임 호출된다
 #include <xnamath.h>
 
 
-#define MAX_BUFFER_VERTEX				10000	// 최대 버퍼 정점 수
+#define MAX_BUFFER_VERTEX				10000	// 최대 버퍼 정점수
 
 
-// 링크 라이브러리 
+// 링크 라이브러리
 #pragma comment( lib, "d3d11.lib" )   // D3D11라이브러리 
 #pragma comment( lib, "d3dx11.lib" )
 
 
-// 세이프 릴리스 매크로 
+// 세이프 릴리스 매크로
 #ifndef SAFE_RELEASE
 #define SAFE_RELEASE( p )      { if ( p ) { ( p )->Release(); ( p )=NULL; } }
 #endif
 
 
-// 정점 구조체 
+// 정점 구조체
 struct CUSTOMVERTEX {
     XMFLOAT4	v4Pos;
     XMFLOAT4	v4Color;
 	XMFLOAT2	v2UV;
 };
 
-// 셰이더 상수 구조체 
+// 셰이더 상수 구조체
 struct CBNeverChanges
 {
     XMMATRIX mView;
 };
 
-// 텍스처 그림 구조체 
+// 텍스처 그림 구조체
 struct TEX_PICTURE {
 	ID3D11ShaderResourceView	*pSRViewTexture;
 	D3D11_TEXTURE2D_DESC		tdDesc;
@@ -129,20 +130,21 @@ struct TEX_PICTURE {
 };
 
 
-// 글로벌 변수 
-UINT  g_nClientWidth;							// 그릴 영역 너비 
+// 전역 변수 
+UINT  g_nClientWidth;							// 그릴 영역 너비
 UINT  g_nClientHeight;							// 그릴 영역 높이 
 
 
 ID3D11Device			*g_pd3dDevice;			// 디바이스 
-IDXGISwapChain			*g_pSwapChain;			// DXGI스왑체인 
-ID3D11DeviceContext		*g_pImmediateContext;	// 디바이스 컨텍스트
-ID3D11RasterizerState	*g_pRS;					// 래스터라이저 
-ID3D11RenderTargetView	*g_pRTV;				// 렌더링 타깃 
-D3D_FEATURE_LEVEL       g_FeatureLevel;			// 피처 레벨 
+IDXGISwapChain			*g_pSwapChain;			// DXGI 스왑 체인
+ID3D11DeviceContext		*g_pImmediateContext;	// 디바이스 컨텍스트 
+ID3D11RasterizerState	*g_pRS;					// 래스터라이저
+ID3D11RenderTargetView	*g_pRTV;				// 렌더링 타겟
+D3D_FEATURE_LEVEL       g_FeatureLevel;			// 피처 레벨
 
 ID3D11Buffer			*g_pD3D11VertexBuffer;
 ID3D11BlendState		*g_pbsAddBlend;
+ID3D11BlendState		*g_pbsAlphaBlend;
 ID3D11VertexShader		*g_pVertexShader;
 ID3D11PixelShader		*g_pPixelShader;
 ID3D11InputLayout		*g_pInputLayout;
@@ -152,14 +154,15 @@ ID3D11Buffer			*g_pCBNeverChanges = NULL;
 
 TEX_PICTURE				g_tRay;
 TEX_PICTURE				g_tBack;
+TEX_PICTURE				g_tPlayer;
 
-// 그리기 정점 버퍼 
+// 그릴 정점 버퍼 
 CUSTOMVERTEX g_cvVertices[MAX_BUFFER_VERTEX];
 int							g_nVertexNum = 0;
 ID3D11ShaderResourceView	*g_pNowTexture = NULL;
 
 
-// Direct3D 초기화
+// Direct3D 초기화 
 HRESULT InitD3D( void )
 {
     HRESULT hr = S_OK;
@@ -172,7 +175,7 @@ HRESULT InitD3D( void )
 	UINT               numLevelsRequested = 6;
 	D3D_FEATURE_LEVEL  FeatureLevelsSupported;
 
-	// 디바이스 작성 
+	// 디바이스 작성
 	hr = D3D11CreateDevice( NULL,
 					D3D_DRIVER_TYPE_HARDWARE, 
 					NULL, 
@@ -187,7 +190,7 @@ HRESULT InitD3D( void )
 		return hr;
 	}
 
-	// 팩토리 취득 
+	// 팩토리 획득
 	IDXGIDevice * pDXGIDevice;
 	hr = g_pd3dDevice->QueryInterface( __uuidof( IDXGIDevice ), ( void ** )&pDXGIDevice );
 	IDXGIAdapter * pDXGIAdapter;
@@ -195,7 +198,7 @@ HRESULT InitD3D( void )
 	IDXGIFactory * pIDXGIFactory;
 	pDXGIAdapter->GetParent( __uuidof( IDXGIFactory ), ( void ** )&pIDXGIFactory);
 
-	// 스왑체인 작성 
+	// 스왑 체인 작성
     DXGI_SWAP_CHAIN_DESC	sd;
 	ZeroMemory( &sd, sizeof( sd ) );
 	sd.BufferCount = 1;
@@ -219,7 +222,7 @@ HRESULT InitD3D( void )
 		return hr;
 	}
 
-    // 렌더링 타깃 생성 
+    // 렌더링 타겟 생성
     ID3D11Texture2D			*pBackBuffer = NULL;
     D3D11_TEXTURE2D_DESC BackBufferSurfaceDesc;
     hr = g_pSwapChain->GetBuffer( 0, __uuidof( ID3D11Texture2D ), ( LPVOID* )&pBackBuffer );
@@ -237,7 +240,7 @@ HRESULT InitD3D( void )
 
     g_pImmediateContext->OMSetRenderTargets( 1, &g_pRTV, NULL );
 
-    // 래스터라이저 설정
+    // 래스터 라이저 설정 
     D3D11_RASTERIZER_DESC drd;
 	ZeroMemory( &drd, sizeof( drd ) );
 	drd.FillMode				= D3D11_FILL_SOLID;
@@ -251,7 +254,7 @@ HRESULT InitD3D( void )
     }
     g_pImmediateContext->RSSetState( g_pRS );
 
-    // 뷰포트 설정 
+    // 뷰포트 설정
     D3D11_VIEWPORT vp;
     vp.Width    = ( FLOAT )g_nClientWidth;
     vp.Height   = ( FLOAT )g_nClientHeight;
@@ -265,7 +268,7 @@ HRESULT InitD3D( void )
 }
 
 
-// 프로그래머블 셰이더 작성 
+// 프로그래머블 셰이더 작성
 HRESULT MakeShaders( void )
 {
     HRESULT hr;
@@ -342,7 +345,7 @@ HRESULT MakeShaders( void )
     if( FAILED( hr ) )
         return hr;
 
-	// 변환행렬 
+	// 변환 행렬 
     CBNeverChanges	cbNeverChanges;
 	XMMATRIX		mScreen;
     mScreen = XMMatrixIdentity();
@@ -392,10 +395,11 @@ int InitDrawModes( void )
 {
     HRESULT hr;
 
-	// 블렌드 스테이트(가산)
+	// 블렌드 스테이트 
     D3D11_BLEND_DESC BlendDesc;
 	BlendDesc.AlphaToCoverageEnable = FALSE;
 	BlendDesc.IndependentBlendEnable = FALSE;
+	// 가산반투명
     BlendDesc.RenderTarget[0].BlendEnable           = TRUE;
     BlendDesc.RenderTarget[0].SrcBlend              = D3D11_BLEND_ONE;
     BlendDesc.RenderTarget[0].DestBlend             = D3D11_BLEND_ONE;
@@ -405,6 +409,19 @@ int InitDrawModes( void )
     BlendDesc.RenderTarget[0].BlendOpAlpha          = D3D11_BLEND_OP_ADD;
     BlendDesc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
     hr = g_pd3dDevice->CreateBlendState( &BlendDesc, &g_pbsAddBlend );
+    if ( FAILED( hr ) ) {
+        return hr;
+    }
+	// 알파 블렌딩
+    BlendDesc.RenderTarget[0].BlendEnable           = TRUE;
+    BlendDesc.RenderTarget[0].SrcBlend              = D3D11_BLEND_SRC_ALPHA;
+    BlendDesc.RenderTarget[0].DestBlend             = D3D11_BLEND_INV_SRC_ALPHA;
+    BlendDesc.RenderTarget[0].BlendOp               = D3D11_BLEND_OP_ADD;
+    BlendDesc.RenderTarget[0].SrcBlendAlpha         = D3D11_BLEND_ONE;
+    BlendDesc.RenderTarget[0].DestBlendAlpha        = D3D11_BLEND_ZERO;
+    BlendDesc.RenderTarget[0].BlendOpAlpha          = D3D11_BLEND_OP_ADD;
+    BlendDesc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+    hr = g_pd3dDevice->CreateBlendState( &BlendDesc, &g_pbsAlphaBlend );
     if ( FAILED( hr ) ) {
         return hr;
     }
@@ -433,7 +450,7 @@ HRESULT InitGeometry( void )
 {
     HRESULT hr = S_OK;
 
-    // ㅇ점 버퍼 초기화 
+    // 정점 버퍼 작성 
     D3D11_BUFFER_DESC BufferDesc;
     BufferDesc.Usage                = D3D11_USAGE_DYNAMIC;
     BufferDesc.ByteWidth            = sizeof( CUSTOMVERTEX ) * MAX_BUFFER_VERTEX;
@@ -452,9 +469,9 @@ HRESULT InitGeometry( void )
 
 	// 텍스처 작성 
 	g_tRay.pSRViewTexture =  NULL;
-	hr = LoadTexture( _T( "Laser_2.BMP" ), &g_tRay, 16, 16, 16, 16 );
+	hr = LoadTexture( _T( "14.BMP" ), &g_tRay, 16, 16, 16, 16 );
     if ( FAILED( hr ) ) {
- 		MessageBox( NULL, _T( "Can't open Laser_2.BMP" ), _T( "Error" ), MB_OK );
+ 		MessageBox( NULL, _T( "Can't open 14.BMP" ), _T( "Error" ), MB_OK );
         return hr;
     }
 	hr = LoadTexture( _T( "16.bmp" ), &g_tBack, 640, 480, 1024, 512 );
@@ -462,12 +479,17 @@ HRESULT InitGeometry( void )
  		MessageBox( NULL, _T( "Can't open 16.BMP" ), _T( "Error" ), MB_OK );
         return hr;
     }
+	hr = LoadTexture( _T( "15.dds" ), &g_tPlayer, 64, 64, 64, 64 );
+    if ( FAILED( hr ) ) {
+ 		MessageBox( NULL, _T( "Can't open 15.dds" ), _T( "Error" ), MB_OK );
+       return hr;
+    }
 
 	return S_OK;
 }
 
 
-// 종료처리 
+// 종료 처리 
 int Cleanup( void )
 {
     SAFE_RELEASE( g_tRay.pSRViewTexture );
@@ -476,6 +498,7 @@ int Cleanup( void )
 
     SAFE_RELEASE( g_pSamplerState );
     SAFE_RELEASE( g_pbsAddBlend );
+    SAFE_RELEASE( g_pbsAlphaBlend );
     SAFE_RELEASE( g_pInputLayout );
     SAFE_RELEASE( g_pPixelShader );
     SAFE_RELEASE( g_pVertexShader );
@@ -483,28 +506,28 @@ int Cleanup( void )
 
     SAFE_RELEASE( g_pRS );									// 래스터라이저 
 
-	// 스테이터스 클리어 
+	// 스테이터스를 클리어
 	if ( g_pImmediateContext ) {
 		g_pImmediateContext->ClearState();
 		g_pImmediateContext->Flush();
 	}
 
-    SAFE_RELEASE( g_pRTV );									// 렌더링 타깃 
+    SAFE_RELEASE( g_pRTV );									// 렌더링 타깃
 
-    // 스왑체인 
+    // 스왑 체인
     if ( g_pSwapChain != NULL ) {
         g_pSwapChain->SetFullscreenState( FALSE, 0 );
     }
     SAFE_RELEASE( g_pSwapChain );
 
-    SAFE_RELEASE( g_pImmediateContext );					// 디바이스 컨텍스트 
+    SAFE_RELEASE( g_pImmediateContext );					// 디바이스 컨텍스트
     SAFE_RELEASE( g_pd3dDevice );							// 디바이스 
 
 	return 0;
 }
 
 
-//  윈도 프로시저
+// 윈도우 프로시저 
 LRESULT WINAPI MsgProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam )
 {
     switch( msg )
@@ -518,7 +541,7 @@ LRESULT WINAPI MsgProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam )
 }
 
 
-// 그림 그리기 대기행렬 플러시
+// 그리기 대기행렬 플러시 
 int FlushDrawingPictures( void )
 {
 	HRESULT			hr;
@@ -540,12 +563,12 @@ int FlushDrawingPictures( void )
 }
 
 
-// 그림 그리기 
+// 그리기 
 int DrawPicture( float x, float y, TEX_PICTURE *pTexPic )
 {
-	if ( g_nVertexNum > ( MAX_BUFFER_VERTEX - 6 ) ) return -1;	// 정점이 버퍼에서 넘치면 그리지 않고 
+	if ( g_nVertexNum > ( MAX_BUFFER_VERTEX - 6 ) ) return -1;	// 정점이 버퍼에서 넘칠 때는 그리지 않고 
 
-	// 텍스처가 바뀌면 대기 행렬 플러시 
+	// 텍스처가 전환되면 대기 행렬 플러시 
 	if ( ( pTexPic->pSRViewTexture != g_pNowTexture ) && g_pNowTexture ) {
 		FlushDrawingPictures();
 	}
@@ -576,14 +599,14 @@ int DrawPicture( float x, float y, TEX_PICTURE *pTexPic )
 int DrawQuadranglePic( float x1, float y1, float x2, float y2, 
 					   float x3, float y3, float x4, float y4, TEX_PICTURE *pTexPic )
 {
-	if ( g_nVertexNum > ( MAX_BUFFER_VERTEX - 6 ) ) return -1;	//  정점이 버퍼에서 넘치면 그리지 않고
+	if ( g_nVertexNum > ( MAX_BUFFER_VERTEX - 6 ) ) return -1;	// 정점이 버퍼에서 넘칠 때는 그리지 않고 
 
-	// 텍스처가 바뀌면 대기행렬 플러시
+	// 텍스처가 전환되면 대기 행렬 플러시 
 	if ( ( pTexPic->pSRViewTexture != g_pNowTexture ) && g_pNowTexture ) {
 		FlushDrawingPictures();
 	}
 
-	// 정점 세트
+	// 정점 설정 
 	g_cvVertices[g_nVertexNum + 0].v4Pos   = XMFLOAT4( x1, y1, 0.0f, 1.0f );
 	g_cvVertices[g_nVertexNum + 0].v4Color = XMFLOAT4( 1.0f, 1.0f, 1.0f, 1.0f );
 	g_cvVertices[g_nVertexNum + 0].v2UV    = XMFLOAT2( 0.0f, 0.0f );
@@ -592,11 +615,11 @@ int DrawQuadranglePic( float x1, float y1, float x2, float y2,
 	g_cvVertices[g_nVertexNum + 1].v2UV    = XMFLOAT2( 0.0f, 1.0f );
 	g_cvVertices[g_nVertexNum + 2].v4Pos   = XMFLOAT4( x2, y2, 0.0f, 1.0f );
 	g_cvVertices[g_nVertexNum + 2].v4Color = XMFLOAT4( 1.0f, 1.0f, 1.0f, 1.0f );
-	g_cvVertices[g_nVertexNum + 2].v2UV    = XMFLOAT2( 0.0f, 0.0f );
+	g_cvVertices[g_nVertexNum + 2].v2UV    = XMFLOAT2( 1.0f, 0.0f );
 	g_cvVertices[g_nVertexNum + 3] = g_cvVertices[g_nVertexNum + 1];
 	g_cvVertices[g_nVertexNum + 4].v4Pos   = XMFLOAT4( x4, y4, 0.0f, 1.0f );
 	g_cvVertices[g_nVertexNum + 4].v4Color = XMFLOAT4( 1.0f, 1.0f, 1.0f, 1.0f );
-	g_cvVertices[g_nVertexNum + 4].v2UV    = XMFLOAT2( 0.0f, 1.0f );
+	g_cvVertices[g_nVertexNum + 4].v2UV    = XMFLOAT2( 1.0f, 1.0f );
 	g_cvVertices[g_nVertexNum + 5] = g_cvVertices[g_nVertexNum + 2];
 	g_nVertexNum += 6;
 	g_pNowTexture = pTexPic->pSRViewTexture;
@@ -618,7 +641,7 @@ HRESULT Render( void )
     g_pImmediateContext->PSSetSamplers( 0, 1, &g_pSamplerState );
     g_pImmediateContext->RSSetState( g_pRS );
     
-    // 화면 설정 
+    // 그리기 설정 
     UINT nStrides = sizeof( CUSTOMVERTEX );
     UINT nOffsets = 0;
     g_pImmediateContext->IASetVertexBuffers( 0, 1, &g_pD3D11VertexBuffer, &nStrides, &nOffsets );
@@ -634,13 +657,16 @@ HRESULT Render( void )
     g_pImmediateContext->OMSetBlendState( NULL, NULL, 0xFFFFFFFF );
 	DrawPicture( 0.0f, 0.0f, &g_tBack );
 	FlushDrawingPictures();
+    g_pImmediateContext->OMSetBlendState( g_pbsAlphaBlend, NULL, 0xFFFFFFFF );
+	DrawPicture( 0.0f, 240.0f - 32.0f, &g_tPlayer );
+ 	FlushDrawingPictures();
     g_pImmediateContext->OMSetBlendState( g_pbsAddBlend, NULL, 0xFFFFFFFF );
-	for ( i = 0; i < nDivideNum * 4; i += 4 ) {
+	for ( i = 0; i < DIVIDE_NUM * 4; i += 4 ) {
 		DrawQuadranglePic( v2Pos[i].x, v2Pos[i].y, v2Pos[i + 1].x, v2Pos[i + 1].y,
 						   v2Pos[i + 2].x, v2Pos[i + 2].y, v2Pos[i + 3].x, v2Pos[i + 3].y, &g_tRay );
 	}
 
-    // 표시 
+    // 표시
 	FlushDrawingPictures();
 
     return S_OK;
@@ -650,11 +676,11 @@ HRESULT Render( void )
 // 엔트리 포인트 
 int WINAPI _tWinMain( HINSTANCE hInst, HINSTANCE, LPTSTR, int )
 {
-	LARGE_INTEGER			nNowTime, nLastTime;		// 현재와 직전 시각 
-	LARGE_INTEGER			nTimeFreq;					// 시간단위 
+	LARGE_INTEGER			nNowTime, nLastTime;		// 현재와 하나 앞의 시각
+	LARGE_INTEGER			nTimeFreq;					// 시간 단위 
 
-    // 화면 사이즈 
-    g_nClientWidth  = VIEW_WIDTH;						// 너비 
+    // 화면 크기 
+    g_nClientWidth  = VIEW_WIDTH;						// 너비
     g_nClientHeight = VIEW_HEIGHT;						// 높이 
 
 	// Register the window class
@@ -666,7 +692,7 @@ int WINAPI _tWinMain( HINSTANCE hInst, HINSTANCE, LPTSTR, int )
 	RECT rcRect;
 	SetRect( &rcRect, 0, 0, g_nClientWidth, g_nClientHeight );
 	AdjustWindowRect( &rcRect, WS_OVERLAPPEDWINDOW, FALSE );
-    g_hWnd = CreateWindow( _T( "D3D Sample" ), _T( "Ray_3_1" ),
+    g_hWnd = CreateWindow( _T( "D3D Sample" ), _T( "Ray_4_1" ),
 						   WS_OVERLAPPEDWINDOW, 100, 20, rcRect.right - rcRect.left, rcRect.bottom - rcRect.top,
 						   GetDesktopWindow(), NULL, wc.hInstance, NULL );
 
@@ -676,16 +702,16 @@ int WINAPI _tWinMain( HINSTANCE hInst, HINSTANCE, LPTSTR, int )
         // Create the shaders
         if( SUCCEEDED( InitDrawModes() ) )
         {
-			if ( SUCCEEDED( InitGeometry() ) ) {					// 지오메트리 초기화 
+			if ( SUCCEEDED( InitGeometry() ) ) {					// 지오메트리 잭성 
 
 				// Show the window
 				ShowWindow( g_hWnd, SW_SHOWDEFAULT );
 				UpdateWindow( g_hWnd );
 
-				InitRay();											// 광선 초기화
+				InitRay();											// 광선초기화
 				
-				QueryPerformanceFrequency( &nTimeFreq );			// 시간단위 
-				QueryPerformanceCounter( &nLastTime );				// 1프레임전 시각 초기화 
+				QueryPerformanceFrequency( &nTimeFreq );			// 시간단위
+				QueryPerformanceCounter( &nLastTime );				// 1프레임전 시각 초기화
 
 				// Enter the message loop
 				MSG msg;
@@ -709,7 +735,7 @@ int WINAPI _tWinMain( HINSTANCE hInst, HINSTANCE, LPTSTR, int )
 						QueryPerformanceCounter( &nNowTime );
 					}
 					nLastTime = nNowTime;
-					g_pSwapChain->Present( 0, 0 );					// 표시 
+					g_pSwapChain->Present( 0, 0 );					// 표시
 				}
 			}
         }
