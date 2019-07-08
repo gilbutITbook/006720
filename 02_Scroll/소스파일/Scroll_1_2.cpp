@@ -123,7 +123,9 @@ ID3D11SamplerState		*g_pSamplerState;
 
 ID3D11Buffer				*g_pCBNeverChanges = NULL;
 
-TEX_PICTURE				g_tBack;
+TEX_PICTURE				g_tBack1;
+TEX_PICTURE				g_tBack2;
+TEX_PICTURE				g_tBack3;
 
 // 그리기 정점 버퍼 
 CUSTOMVERTEX g_cvVertices[MAX_BUFFER_VERTEX];
